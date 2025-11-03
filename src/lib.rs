@@ -1,7 +1,64 @@
 use fontdue::Font;
 use std::path::Path;
 
+/// Character set to use for rendering
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum CharacterSet {
+    /// 70-character density ramp (most detail)
+    #[default]
+    Density,
+    /// Simple block/space (minimal, works best with colors)
+    Blocks,
+}
+
+/// Color mode for rendering
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ColorMode {
+    /// No colors, monochrome (most compatible)
+    #[default]
+    None,
+    /// ANSI 256-color grayscale (24 shades, requires terminal support)
+    Ansi256,
+    /// ANSI truecolor grayscale (256 shades, requires terminal support)
+    AnsiTruecolor,
+}
+
+/// Rendering mode combining character set and color mode
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct RenderMode {
+    pub characters: CharacterSet,
+    pub colors: ColorMode,
+}
+
+impl RenderMode {
+    /// ASCII mode: density characters, no colors (default, most compatible)
+    pub const ASCII: Self = Self {
+        characters: CharacterSet::Density,
+        colors: ColorMode::None,
+    };
+
+    /// ANSI 256-color mode: blocks with 256-color grayscale
+    pub const ANSI256: Self = Self {
+        characters: CharacterSet::Blocks,
+        colors: ColorMode::Ansi256,
+    };
+
+    /// ANSI truecolor mode: blocks with 24-bit grayscale
+    pub const ANSI_TRUECOLOR: Self = Self {
+        characters: CharacterSet::Blocks,
+        colors: ColorMode::AnsiTruecolor,
+    };
+
+    /// Create a custom rendering mode
+    pub const fn new(characters: CharacterSet, colors: ColorMode) -> Self {
+        Self { characters, colors }
+    }
+}
+
 /// Renders a single Unicode character as ASCII art within the given dimensions.
+///
+/// Uses ASCII character density for grayscale rendering (most compatible).
+/// For ANSI color support, use `render_char_with_mode`.
 ///
 /// # Arguments
 /// * `font_path` - Path to the TTF/OTF font file
@@ -23,6 +80,27 @@ pub fn render_char(
     width: usize,
     height: usize,
 ) -> Result<Vec<String>, String> {
+    render_char_with_mode(font_path, codepoint, width, height, RenderMode::default())
+}
+
+/// Renders a single Unicode character as ASCII art with configurable rendering mode.
+///
+/// # Arguments
+/// * `font_path` - Path to the TTF/OTF font file
+/// * `codepoint` - The Unicode character to render
+/// * `width` - Target width in terminal characters
+/// * `height` - Target height in terminal characters
+/// * `mode` - Rendering mode (Ascii, Ansi256, or AnsiTruecolor)
+///
+/// # Returns
+/// A vector of strings, one per line, representing the ASCII art
+pub fn render_char_with_mode(
+    font_path: impl AsRef<Path>,
+    codepoint: char,
+    width: usize,
+    height: usize,
+    mode: RenderMode,
+) -> Result<Vec<String>, String> {
     // Load font file
     let font_data = std::fs::read(font_path).map_err(|e| format!("Failed to read font: {}", e))?;
     let font = Font::from_bytes(font_data.as_slice(), fontdue::FontSettings::default())
@@ -38,24 +116,25 @@ pub fn render_char(
     // Rasterize the glyph
     let (metrics, bitmap) = font.rasterize(codepoint, font_size);
 
-    // Convert bitmap to ASCII using grayscale character density mapping
-    bitmap_to_ascii(&bitmap, metrics.width, metrics.height, width, height)
+    // Convert bitmap to ASCII using the specified rendering mode
+    bitmap_to_ascii(&bitmap, metrics.width, metrics.height, width, height, mode)
 }
 
-/// Converts a grayscale bitmap to ASCII art using character density mapping
+/// Converts a grayscale bitmap to ASCII art using the specified rendering mode
 fn bitmap_to_ascii(
     bitmap: &[u8],
     bitmap_width: usize,
     bitmap_height: usize,
     target_width: usize,
     target_height: usize,
+    mode: RenderMode,
 ) -> Result<Vec<String>, String> {
     if bitmap.is_empty() {
         return Ok(vec![" ".repeat(target_width); target_height]);
     }
 
     // Grayscale character ramp ordered by visual density (lightest to darkest)
-    // This ramp provides smooth gradations for better character rendering
+    // Used for ASCII mode
     const DENSITY_RAMP: &[char] = &[
         ' ', '.', '\'', '`', '^', '"', ',', ':', ';', 'I', 'l', '!', 'i', '>', '<', '~', '+', '_',
         '-', '?', ']', '[', '}', '{', '1', ')', '(', '|', '\\', '/', 't', 'f', 'j', 'r', 'x', 'n',
@@ -67,7 +146,7 @@ fn bitmap_to_ascii(
 
     // Simple nearest-neighbor sampling from bitmap to target dimensions
     for row in 0..target_height {
-        let mut line = String::with_capacity(target_width);
+        let mut line = String::new();
 
         for col in 0..target_width {
             // Map target position to bitmap position
@@ -77,11 +156,50 @@ fn bitmap_to_ascii(
             let idx = bmp_y * bitmap_width + bmp_x;
             let pixel = if idx < bitmap.len() { bitmap[idx] } else { 0 };
 
-            // Map pixel intensity (0-255) to character density
-            // Higher pixel values (lighter in fontdue's output) = denser characters
-            let density_idx = ((pixel as usize) * (DENSITY_RAMP.len() - 1)) / 255;
-            let ch = DENSITY_RAMP[density_idx];
-            line.push(ch);
+            // Choose character based on character set
+            let ch = match mode.characters {
+                CharacterSet::Density => {
+                    // Map pixel intensity (0-255) to character density
+                    // Higher pixel values = denser characters
+                    let density_idx = ((pixel as usize) * (DENSITY_RAMP.len() - 1)) / 255;
+                    DENSITY_RAMP[density_idx]
+                }
+                CharacterSet::Blocks => ' ',
+            };
+
+            // Apply color based on color mode
+            match mode.colors {
+                ColorMode::None => {
+                    // No color, just push the character
+                    line.push(ch);
+                }
+                ColorMode::Ansi256 => {
+                    // ANSI 256-color grayscale (colors 232-255 are grayscale)
+                    // Map 0-255 pixel value to 232-255 color range (24 shades)
+                    let gray_idx = 232 + ((pixel as usize * 23) / 255);
+                    if matches!(mode.characters, CharacterSet::Blocks) {
+                        // Use background color for blocks
+                        line.push_str(&format!("\x1b[48;5;{}m \x1b[0m", gray_idx));
+                    } else {
+                        // Use foreground color for characters
+                        line.push_str(&format!("\x1b[38;5;{}m{}\x1b[0m", gray_idx, ch));
+                    }
+                }
+                ColorMode::AnsiTruecolor => {
+                    // ANSI truecolor (24-bit) for smoothest grayscale
+                    // Higher pixel values = lighter (closer to white)
+                    if matches!(mode.characters, CharacterSet::Blocks) {
+                        // Use background color for blocks
+                        line.push_str(&format!("\x1b[48;2;{};{};{}m \x1b[0m", pixel, pixel, pixel));
+                    } else {
+                        // Use foreground color for characters
+                        line.push_str(&format!(
+                            "\x1b[38;2;{};{};{}m{}\x1b[0m",
+                            pixel, pixel, pixel, ch
+                        ));
+                    }
+                }
+            }
         }
 
         result.push(line);
@@ -96,7 +214,7 @@ mod tests {
 
     #[test]
     fn test_bitmap_to_ascii_empty() {
-        let result = bitmap_to_ascii(&[], 0, 0, 5, 3).unwrap();
+        let result = bitmap_to_ascii(&[], 0, 0, 5, 3, RenderMode::default()).unwrap();
         assert_eq!(result.len(), 3);
         assert_eq!(result[0], "     ");
     }
@@ -105,7 +223,7 @@ mod tests {
     fn test_bitmap_to_ascii_simple() {
         // 2x2 bitmap with a simple pattern (max brightness and dark)
         let bitmap = vec![255, 0, 0, 255];
-        let result = bitmap_to_ascii(&bitmap, 2, 2, 2, 2).unwrap();
+        let result = bitmap_to_ascii(&bitmap, 2, 2, 2, 2, RenderMode::default()).unwrap();
         assert_eq!(result.len(), 2);
         // 255 maps to darkest char ('$'), 0 maps to lightest (' ')
         assert_eq!(result[0].chars().next().unwrap(), '$');
