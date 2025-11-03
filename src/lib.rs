@@ -176,12 +176,18 @@ fn bitmap_to_ascii(
                 ColorMode::Ansi256 => {
                     // ANSI 256-color grayscale (colors 232-255 are grayscale)
                     // Map 0-255 pixel value to 232-255 color range (24 shades)
-                    let gray_idx = 232 + ((pixel as usize * 23) / 255);
                     if matches!(mode.characters, CharacterSet::Blocks) {
-                        // Use background color for blocks
-                        line.push_str(&format!("\x1b[48;5;{}m \x1b[0m", gray_idx));
+                        // Use background color for blocks, but skip pure black to avoid
+                        // explicitly setting background (keeps terminal background transparent)
+                        if pixel == 0 {
+                            line.push(' ');
+                        } else {
+                            let gray_idx = 232 + ((pixel as usize * 23) / 255);
+                            line.push_str(&format!("\x1b[48;5;{}m \x1b[0m", gray_idx));
+                        }
                     } else {
                         // Use foreground color for characters
+                        let gray_idx = 232 + ((pixel as usize * 23) / 255);
                         line.push_str(&format!("\x1b[38;5;{}m{}\x1b[0m", gray_idx, ch));
                     }
                 }
@@ -189,8 +195,16 @@ fn bitmap_to_ascii(
                     // ANSI truecolor (24-bit) for smoothest grayscale
                     // Higher pixel values = lighter (closer to white)
                     if matches!(mode.characters, CharacterSet::Blocks) {
-                        // Use background color for blocks
-                        line.push_str(&format!("\x1b[48;2;{};{};{}m \x1b[0m", pixel, pixel, pixel));
+                        // Use background color for blocks, but skip pure black to avoid
+                        // explicitly setting background (keeps terminal background transparent)
+                        if pixel == 0 {
+                            line.push(' ');
+                        } else {
+                            line.push_str(&format!(
+                                "\x1b[48;2;{};{};{}m \x1b[0m",
+                                pixel, pixel, pixel
+                            ));
+                        }
                     } else {
                         // Use foreground color for characters
                         line.push_str(&format!(
