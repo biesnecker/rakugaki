@@ -13,91 +13,42 @@ use std::path::Path;
 /// A vector of strings, one per line, representing the ASCII art
 ///
 /// # Note
-/// Uses a default aspect ratio of 2.0 (terminal chars are ~2x taller than wide).
-/// For custom aspect ratios, use `render_char_with_aspect_ratio`.
+/// The width and height define the visual space for rendering. Users should
+/// adjust these dimensions to account for their terminal's character cell
+/// aspect ratio. For example, if terminal cells are 2:1 (height:width),
+/// a visually square character would use dimensions like 40×20.
 pub fn render_char(
     font_path: impl AsRef<Path>,
     codepoint: char,
     width: usize,
     height: usize,
 ) -> Result<Vec<String>, String> {
-    render_char_with_aspect_ratio(font_path, codepoint, width, height, 2.0)
-}
-
-/// Renders a single Unicode character as ASCII art with configurable aspect ratio.
-///
-/// # Arguments
-/// * `font_path` - Path to the TTF/OTF font file
-/// * `codepoint` - The Unicode character to render
-/// * `width` - Target width in terminal characters
-/// * `height` - Target height in terminal characters
-/// * `aspect_ratio` - Character cell height-to-width ratio (e.g., 2.0 means cells are 2x taller than wide)
-///
-/// # Returns
-/// A vector of strings, one per line, representing the ASCII art
-///
-/// # Common Aspect Ratios
-/// * 2.0 - Traditional terminal fonts (e.g., 8x16)
-/// * 1.67 - Modern monospace fonts (3:5 width:height ratio)
-/// * 1.25 - Some terminals like VT220 (8x10 cells)
-pub fn render_char_with_aspect_ratio(
-    font_path: impl AsRef<Path>,
-    codepoint: char,
-    width: usize,
-    height: usize,
-    aspect_ratio: f32,
-) -> Result<Vec<String>, String> {
     // Load font file
     let font_data = std::fs::read(font_path).map_err(|e| format!("Failed to read font: {}", e))?;
     let font = Font::from_bytes(font_data.as_slice(), fontdue::FontSettings::default())
         .map_err(|e| format!("Failed to parse font: {}", e))?;
 
-    // To render correctly, we need to think in "physical" pixels.
-    // If terminal cells are aspect_ratio:1 (height:width), then to fill
-    // our target area with square pixels, we need:
-    // - width characters × 1 unit wide each = width physical pixels wide
-    // - height characters × aspect_ratio units tall each = height × aspect_ratio physical pixels tall
-    //
-    // We want to render the glyph at a size that will look right when sampled
-    // into our character grid accounting for non-square cells.
+    // Render to fill the visual space defined by width × height.
+    // We treat the dimensions as defining a square-pixel space and let the user
+    // choose dimensions that look right for their terminal.
 
-    let physical_width = width as f32;
-    let physical_height = height as f32 * aspect_ratio;
-
-    // Use the larger physical dimension to render at good quality
-    // (fontdue's size parameter roughly corresponds to pixel height)
-    let font_size = physical_width.max(physical_height);
+    // Use the larger dimension to render at good quality
+    let font_size = (width.max(height) as f32) * 1.2;
 
     // Rasterize the glyph
     let (metrics, bitmap) = font.rasterize(codepoint, font_size);
 
     // Convert bitmap to ASCII using simple thresholding
-    bitmap_to_ascii(
-        &bitmap,
-        metrics.width,
-        metrics.height,
-        width,
-        height,
-        aspect_ratio,
-    )
+    bitmap_to_ascii(&bitmap, metrics.width, metrics.height, width, height)
 }
 
 /// Converts a grayscale bitmap to ASCII art using simple thresholding
-///
-/// # Arguments
-/// * `bitmap` - Grayscale bitmap data (0-255 values)
-/// * `bitmap_width` - Width of the bitmap in pixels
-/// * `bitmap_height` - Height of the bitmap in pixels
-/// * `target_width` - Target width in terminal characters
-/// * `target_height` - Target height in terminal characters
-/// * `aspect_ratio` - Terminal cell height-to-width ratio
 fn bitmap_to_ascii(
     bitmap: &[u8],
     bitmap_width: usize,
     bitmap_height: usize,
     target_width: usize,
     target_height: usize,
-    aspect_ratio: f32,
 ) -> Result<Vec<String>, String> {
     if bitmap.is_empty() {
         return Ok(vec![" ".repeat(target_width); target_height]);
@@ -105,33 +56,14 @@ fn bitmap_to_ascii(
 
     let mut result = Vec::with_capacity(target_height);
 
-    // Each terminal cell represents a rectangle in square-pixel space:
-    // - Width: 1 unit
-    // - Height: aspect_ratio units
-    // We need to map our terminal grid back to the bitmap accounting for this.
-
-    // The bitmap represents the glyph in square pixels. To sample it correctly,
-    // we need to think of our terminal grid as covering a rectangular area where
-    // each cell is 1 unit wide but aspect_ratio units tall.
-
-    // Total physical height covered by our terminal grid
-    let physical_grid_height = target_height as f32 * aspect_ratio;
-    let physical_grid_width = target_width as f32;
-
-    // Scale factors from physical space to bitmap space
-    let scale_x = bitmap_width as f32 / physical_grid_width;
-    let scale_y = bitmap_height as f32 / physical_grid_height;
-
+    // Simple nearest-neighbor sampling from bitmap to target dimensions
     for row in 0..target_height {
         let mut line = String::with_capacity(target_width);
 
         for col in 0..target_width {
-            // Map terminal cell position to bitmap position in square pixel space
-            let phys_x = col as f32;
-            let phys_y = row as f32 * aspect_ratio;
-
-            let bmp_x = (phys_x * scale_x) as usize;
-            let bmp_y = (phys_y * scale_y) as usize;
+            // Map target position to bitmap position
+            let bmp_x = (col * bitmap_width) / target_width.max(1);
+            let bmp_y = (row * bitmap_height) / target_height.max(1);
 
             let idx = bmp_y * bitmap_width + bmp_x;
             let pixel = if idx < bitmap.len() { bitmap[idx] } else { 0 };
@@ -153,16 +85,16 @@ mod tests {
 
     #[test]
     fn test_bitmap_to_ascii_empty() {
-        let result = bitmap_to_ascii(&[], 0, 0, 5, 3, 2.0).unwrap();
+        let result = bitmap_to_ascii(&[], 0, 0, 5, 3).unwrap();
         assert_eq!(result.len(), 3);
         assert_eq!(result[0], "     ");
     }
 
     #[test]
     fn test_bitmap_to_ascii_simple() {
-        // 2x2 bitmap with a simple pattern (assuming square cells for simplicity)
+        // 2x2 bitmap with a simple pattern
         let bitmap = vec![255, 0, 0, 255];
-        let result = bitmap_to_ascii(&bitmap, 2, 2, 2, 2, 1.0).unwrap();
+        let result = bitmap_to_ascii(&bitmap, 2, 2, 2, 2).unwrap();
         assert_eq!(result.len(), 2);
         assert_eq!(result[0], "# ");
         assert_eq!(result[1], " #");

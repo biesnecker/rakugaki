@@ -1,4 +1,4 @@
-use rakuga::{render_char, render_char_with_aspect_ratio};
+use rakuga::render_char;
 use std::env;
 
 fn main() {
@@ -6,14 +6,15 @@ fn main() {
 
     if args.len() < 2 {
         eprintln!(
-            "Usage: {} <character> [width] [height] [aspect_ratio] [font_path]",
+            "Usage: {} <character> [width] [height] [font_path]",
             args[0]
         );
         eprintln!("\nExamples:");
         eprintln!("  {} あ", args[0]);
-        eprintln!("  {} カ 30 30", args[0]);
-        eprintln!("  {} カ 30 30 1.67", args[0]);
-        eprintln!("  {} A 20 20 2.0 /path/to/font.ttf", args[0]);
+        eprintln!("  {} カ 40 23  # Roughly square on 2:1 terminals", args[0]);
+        eprintln!("  {} A 20 20 /path/to/font.ttf", args[0]);
+        eprintln!("\nNote: Adjust width and height to match your terminal's aspect ratio.");
+        eprintln!("For terminals with 2:1 cells, use height ≈ width/2 for square chars.");
         std::process::exit(1);
     }
 
@@ -26,35 +27,19 @@ fn main() {
     // Parse height (default: 30)
     let height = args.get(3).and_then(|s| s.parse().ok()).unwrap_or(30);
 
-    // Parse aspect ratio (default: None, which means use default 2.0)
-    let aspect_ratio: Option<f32> = args.get(4).and_then(|s| s.parse().ok());
-
     // Parse font path (default: Noto Sans JP)
     let font_path = args
-        .get(5)
+        .get(4)
         .map(|s| s.as_str())
         .unwrap_or("fonts/noto_sans_jp/NotoSansJP-VariableFont_wght.ttf");
 
-    if let Some(ratio) = aspect_ratio {
-        println!(
-            "Rendering '{}' at {}x{} (aspect ratio {}) using {}",
-            character, width, height, ratio, font_path
-        );
-    } else {
-        println!(
-            "Rendering '{}' at {}x{} (default aspect ratio) using {}",
-            character, width, height, font_path
-        );
-    }
+    println!(
+        "Rendering '{}' at {}x{} using {}",
+        character, width, height, font_path
+    );
     println!();
 
-    let result = if let Some(ratio) = aspect_ratio {
-        render_char_with_aspect_ratio(font_path, character, width, height, ratio)
-    } else {
-        render_char(font_path, character, width, height)
-    };
-
-    match result {
+    match render_char(font_path, character, width, height) {
         Ok(lines) => {
             for line in lines {
                 println!("{}", line);
