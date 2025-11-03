@@ -19,7 +19,7 @@ A Rust library for rendering TTF/OTF font characters as ASCII art in the termina
 
 ## Example
 
-
+```
                       ^I::
                       x$BB'
                       J$vv
@@ -56,6 +56,7 @@ II@$U          lJ@$$Y`.%$$}                       "p$$/
       +(f1+:            rr!              :fb$$$Z>>
                                     ^^_tm@$$@m_
                                  1$$$$#Qfl
+```
 
 ## Usage
 
