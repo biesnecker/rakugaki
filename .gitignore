@@ -1,0 +1,7 @@
+/target
+
+# macOS
+.DS_Store
+
+# Font files (until distribution strategy is decided)
+/fonts/

@@ -1,0 +1,13 @@
+[package]
+name = "rakuga"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+fontdue = "0.9"
+
+[dev-dependencies]
+
+[[example]]
+name = "display"
+path = "examples/display.rs"
