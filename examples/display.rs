@@ -1,4 +1,4 @@
-use rakuga::{CharacterSet, ColorMode, RenderMode, render_char_with_mode};
+use rakugaki::{render_char_with_mode, CharacterSet, ColorMode, RenderMode};
 use std::env;
 
 fn main() {

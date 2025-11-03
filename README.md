@@ -1,4 +1,4 @@
-# Rakuga (落書き)
+# rakugakiki (落書き)
 
 A Rust library for rendering TTF/OTF font characters as ASCII art in the terminal.
 
@@ -9,7 +9,7 @@ A Rust library for rendering TTF/OTF font characters as ASCII art in the termina
 - Flexible rendering with separate character set and color mode options:
   - **Character sets:**
     - Density: 70-character grayscale ramp for detailed rendering
-    - Blocks: Simple blocks/spaces (minimal, works best with colors)
+    - Blocks: Unicode block characters (░▒▓█) with optimized brightness range
   - **Color modes:**
     - None: Monochrome (most compatible)
     - ANSI 256-color: 24 grayscale shades using terminal colors
@@ -17,19 +17,59 @@ A Rust library for rendering TTF/OTF font characters as ASCII art in the termina
   - Mix and match: Use density characters with colors for maximum detail!
 - Fast rendering using `fontdue`
 
+## Example
+
+
+                      ^I::
+                      x$BB'
+                      J$vv
+                      h$__
+                      &$::
+                     l$h                   ;-|vZ##$$U
+   Q&b0Xnt1[--++_-][}Z$$uuXJOpo&$$$$$$$$$$$$MpJr11<^
+   C$$$$$$$$$$$$$$$$$$$$$$$$$$$$$@#d00Xr)-!`
+                     L$_
+                     o$"
+                     8@                    t+.
+                    :$k                   -$$<
+                    -$C                   o$f
+                    1$z         `>?{|||1[|$@,
+                    n$j!xxb@$$$@h0UcxxrzQ$$$$$$a//`
+                  ,v$$$8UU]'            X$z   .]qq$$J^
+                'v%$$$0'               '8@I       /%$#_
+            ``C$$d? 0$]                h@i          .w$#:
+          -&$$#~    w$_               h$~             ;M$c
+         )@$OO"     p$+             }}$w               )$8`
+       [B$C         m$?            x$$X                 f$*
+     ^*$Z.          L$)           w$\\                   a$(
+     O$W"           z$f          f$b                     O$n
+   ^&$J             ($Q        `o$t                      f$q
+  :%$r              !$W       u$M"                       X$Y
+  x$B"              .@$"     )$@?                        Z$x
+!!$$~                Z$\   +%$v                         i$B^
+XX$o                 1$h__8$w.                         '&$t
+OO$Z                 !$$$$$m`                          x$W`
+dd$Y                "O$$$$                           `b$h.
+xx$&"            lC@$oj$@@^                        'Q$@[
+II@$U          lJ@$$Y`.%$$}                       "p$$/
+  .w$$$%a&$$$$$$q_     f$$*                   ;C$$$*>
+      +(f1+:            rr!              :fb$$$Z>>
+                                    ^^_tm@$$@m_
+                                 1$$$$#Qfl
+
 ## Usage
 
 Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rakuga = "0.1.0"
+rakugaki = "0.1.0"
 ```
 
 Basic example:
 
 ```rust
-use rakuga::{render_char, render_char_with_mode, RenderMode, CharacterSet, ColorMode};
+use rakugaki::{render_char, render_char_with_mode, RenderMode, CharacterSet, ColorMode};
 
 fn main() {
     // Default mode: density characters, no colors (most compatible)
@@ -95,7 +135,9 @@ For a visually square character on a 2:1 terminal, use dimensions like 40×20. E
 
 1. **Font Loading**: Uses `fontdue` to parse TTF/OTF font files
 2. **Rasterization**: Converts glyphs to grayscale bitmaps at the target size
-3. **ASCII Conversion**: Maps bitmap pixels to characters using a 70-character density ramp (from ` ` to `$`) for smooth gradations
+3. **ASCII Conversion**: Maps bitmap pixels to characters:
+   - Density mode: 70-character ramp (from ` ` to `$`) for maximum detail
+   - Block mode: Unicode block characters (░▒▓█) with optimized brightness range
 
 ## Primary Use Case
 
@@ -103,7 +145,6 @@ Originally designed for displaying Japanese kana (hiragana and katakana) in term
 
 ## Future Enhancements
 
-- ANSI color output support
 - Half-block characters (▀▄█) for doubled vertical resolution
 - Better font distribution strategy for examples/tests
 - Configurable character density ramps

@@ -5,3 +5,6 @@
 
 # Font files (until distribution strategy is decided)
 /fonts/
+
+# Development tools
+/.beads/

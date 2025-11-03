@@ -1,7 +1,15 @@
 [package]
-name = "rakuga"
+name = "rakugaki"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
+authors = ["John Biesnecker <jbiesnecker@gmail.com>"]
+description = "A Rust library for rendering TTF/OTF font characters as ASCII art in the terminal"
+readme = "README.md"
+homepage = "https://github.com/biesnecker/rakugaki"
+repository = "https://github.com/biesnecker/rakugaki"
+license = "MIT OR Apache-2.0"
+keywords = ["ascii-art", "font", "terminal", "rendering", "unicode"]
+categories = ["command-line-utilities", "graphics", "text-processing"]
 
 [dependencies]
 fontdue = "0.9"

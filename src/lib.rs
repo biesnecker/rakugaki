@@ -156,6 +156,16 @@ fn bitmap_to_ascii(
             let idx = bmp_y * bitmap_width + bmp_x;
             let pixel = if idx < bitmap.len() { bitmap[idx] } else { 0 };
 
+            // Unicode block characters ordered by visual density (lightest to darkest)
+            // Using vertical eighth blocks for smooth gradations
+            const BLOCK_RAMP: &[char] = &[
+                ' ', // Empty
+                '░', // Light shade
+                '▒', // Medium shade
+                '▓', // Dark shade
+                '█', // Full block
+            ];
+
             // Choose character based on character set
             let ch = match mode.characters {
                 CharacterSet::Density => {
@@ -164,7 +174,11 @@ fn bitmap_to_ascii(
                     let density_idx = ((pixel as usize) * (DENSITY_RAMP.len() - 1)) / 255;
                     DENSITY_RAMP[density_idx]
                 }
-                CharacterSet::Blocks => ' ',
+                CharacterSet::Blocks => {
+                    // Map pixel intensity to block density
+                    let block_idx = ((pixel as usize) * (BLOCK_RAMP.len() - 1)) / 255;
+                    BLOCK_RAMP[block_idx]
+                }
             };
 
             // Apply color based on color mode
@@ -175,43 +189,28 @@ fn bitmap_to_ascii(
                 }
                 ColorMode::Ansi256 => {
                     // ANSI 256-color grayscale (colors 232-255 are grayscale)
-                    // Map 0-255 pixel value to 232-255 color range (24 shades)
-                    if matches!(mode.characters, CharacterSet::Blocks) {
-                        // Use background color for blocks, but skip pure black to avoid
-                        // explicitly setting background (keeps terminal background transparent)
-                        if pixel == 0 {
-                            line.push(' ');
-                        } else {
-                            let gray_idx = 232 + ((pixel as usize * 23) / 255);
-                            line.push_str(&format!("\x1b[48;5;{}m \x1b[0m", gray_idx));
-                        }
+                    // Use foreground color for both character sets
+                    let gray_idx = if pixel == 0 {
+                        232 // Pure black for background/empty pixels
                     } else {
-                        // Use foreground color for characters
-                        let gray_idx = 232 + ((pixel as usize * 23) / 255);
-                        line.push_str(&format!("\x1b[38;5;{}m{}\x1b[0m", gray_idx, ch));
-                    }
+                        // Map 1-255 to a compressed range: ~235-250 (dimmer to moderately bright)
+                        235 + ((pixel as usize * 15) / 255)
+                    };
+                    line.push_str(&format!("\x1b[38;5;{}m{}\x1b[0m", gray_idx, ch));
                 }
                 ColorMode::AnsiTruecolor => {
                     // ANSI truecolor (24-bit) for smoothest grayscale
-                    // Higher pixel values = lighter (closer to white)
-                    if matches!(mode.characters, CharacterSet::Blocks) {
-                        // Use background color for blocks, but skip pure black to avoid
-                        // explicitly setting background (keeps terminal background transparent)
-                        if pixel == 0 {
-                            line.push(' ');
-                        } else {
-                            line.push_str(&format!(
-                                "\x1b[48;2;{};{};{}m \x1b[0m",
-                                pixel, pixel, pixel
-                            ));
-                        }
+                    // Use foreground color for both character sets
+                    let adjusted_brightness = if pixel == 0 {
+                        0 // Pure black for background/empty pixels
                     } else {
-                        // Use foreground color for characters
-                        line.push_str(&format!(
-                            "\x1b[38;2;{};{};{}m{}\x1b[0m",
-                            pixel, pixel, pixel, ch
-                        ));
-                    }
+                        // Map 1-255 to a compressed range: ~60-200 (dimmer to moderately bright)
+                        60 + ((pixel as usize * 140) / 255)
+                    };
+                    line.push_str(&format!(
+                        "\x1b[38;2;{};{};{}m{}\x1b[0m",
+                        adjusted_brightness, adjusted_brightness, adjusted_brightness, ch
+                    ));
                 }
             }
         }

@@ -48,7 +48,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rakuga"
+name = "rakugaki"
 version = "0.1.0"
 dependencies = [
  "cargo-husky",
