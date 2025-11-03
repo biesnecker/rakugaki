@@ -38,11 +38,11 @@ pub fn render_char(
     // Rasterize the glyph
     let (metrics, bitmap) = font.rasterize(codepoint, font_size);
 
-    // Convert bitmap to ASCII using simple thresholding
+    // Convert bitmap to ASCII using grayscale character density mapping
     bitmap_to_ascii(&bitmap, metrics.width, metrics.height, width, height)
 }
 
-/// Converts a grayscale bitmap to ASCII art using simple thresholding
+/// Converts a grayscale bitmap to ASCII art using character density mapping
 fn bitmap_to_ascii(
     bitmap: &[u8],
     bitmap_width: usize,
@@ -53,6 +53,15 @@ fn bitmap_to_ascii(
     if bitmap.is_empty() {
         return Ok(vec![" ".repeat(target_width); target_height]);
     }
+
+    // Grayscale character ramp ordered by visual density (lightest to darkest)
+    // This ramp provides smooth gradations for better character rendering
+    const DENSITY_RAMP: &[char] = &[
+        ' ', '.', '\'', '`', '^', '"', ',', ':', ';', 'I', 'l', '!', 'i', '>', '<', '~', '+', '_',
+        '-', '?', ']', '[', '}', '{', '1', ')', '(', '|', '\\', '/', 't', 'f', 'j', 'r', 'x', 'n',
+        'u', 'v', 'c', 'z', 'X', 'Y', 'U', 'J', 'C', 'L', 'Q', '0', 'O', 'Z', 'm', 'w', 'q', 'p',
+        'd', 'b', 'k', 'h', 'a', 'o', '*', '#', 'M', 'W', '&', '8', '%', 'B', '@', '$',
+    ];
 
     let mut result = Vec::with_capacity(target_height);
 
@@ -68,8 +77,10 @@ fn bitmap_to_ascii(
             let idx = bmp_y * bitmap_width + bmp_x;
             let pixel = if idx < bitmap.len() { bitmap[idx] } else { 0 };
 
-            // Simple threshold: 128 is the midpoint of 0-255
-            let ch = if pixel > 128 { '#' } else { ' ' };
+            // Map pixel intensity (0-255) to character density
+            // Higher pixel values (lighter in fontdue's output) = denser characters
+            let density_idx = ((pixel as usize) * (DENSITY_RAMP.len() - 1)) / 255;
+            let ch = DENSITY_RAMP[density_idx];
             line.push(ch);
         }
 
@@ -92,12 +103,15 @@ mod tests {
 
     #[test]
     fn test_bitmap_to_ascii_simple() {
-        // 2x2 bitmap with a simple pattern
+        // 2x2 bitmap with a simple pattern (max brightness and dark)
         let bitmap = vec![255, 0, 0, 255];
         let result = bitmap_to_ascii(&bitmap, 2, 2, 2, 2).unwrap();
         assert_eq!(result.len(), 2);
-        assert_eq!(result[0], "# ");
-        assert_eq!(result[1], " #");
+        // 255 maps to darkest char ('$'), 0 maps to lightest (' ')
+        assert_eq!(result[0].chars().next().unwrap(), '$');
+        assert_eq!(result[0].chars().nth(1).unwrap(), ' ');
+        assert_eq!(result[1].chars().next().unwrap(), ' ');
+        assert_eq!(result[1].chars().nth(1).unwrap(), '$');
     }
 
     #[test]

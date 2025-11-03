@@ -6,7 +6,7 @@ A Rust library for rendering TTF/OTF font characters as ASCII art in the termina
 
 - Renders any Unicode character from TTF/OTF fonts as ASCII art
 - Simple, user-controlled dimensions - you choose what looks right
-- Simple binary thresholding for clean output
+- 70-character grayscale ramp for smooth, detailed rendering
 - Fast rendering using `fontdue`
 
 ## Usage
@@ -62,7 +62,7 @@ For a visually square character on a 2:1 terminal, use dimensions like 40×20. E
 
 1. **Font Loading**: Uses `fontdue` to parse TTF/OTF font files
 2. **Rasterization**: Converts glyphs to grayscale bitmaps at the target size
-3. **ASCII Conversion**: Maps bitmap pixels to characters using simple thresholding
+3. **ASCII Conversion**: Maps bitmap pixels to characters using a 70-character density ramp (from ` ` to `$`) for smooth gradations
 
 ## Primary Use Case
 
@@ -70,10 +70,10 @@ Originally designed for displaying Japanese kana (hiragana and katakana) in term
 
 ## Future Enhancements
 
-- Grayscale ASCII art using multiple character densities (` .:-=#%@`)
 - ANSI color output support
 - Half-block characters (▀▄█) for doubled vertical resolution
 - Better font distribution strategy for examples/tests
+- Configurable character density ramps
 
 ## License
 
