@@ -68,11 +68,7 @@ fn bitmap_to_ascii(
             let bmp_x = (col * bitmap_width) / target_width.max(1);
 
             let idx = bmp_y * bitmap_width + bmp_x;
-            let pixel = if idx < bitmap.len() {
-                bitmap[idx]
-            } else {
-                0
-            };
+            let pixel = if idx < bitmap.len() { bitmap[idx] } else { 0 };
 
             // Simple threshold: 128 is the midpoint of 0-255
             let ch = if pixel > 128 { '#' } else { ' ' };
@@ -131,7 +127,10 @@ mod tests {
         // The output should contain some non-space characters (the glyph)
         let total_chars: String = lines.join("");
         let non_space_count = total_chars.chars().filter(|c| *c != ' ').count();
-        assert!(non_space_count > 0, "Should have some visible character data");
+        assert!(
+            non_space_count > 0,
+            "Should have some visible character data"
+        );
 
         // Print the result for visual inspection
         println!("\nRendered 'あ' (hiragana a) at 20x20:");
