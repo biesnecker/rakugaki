@@ -1,4 +1,4 @@
-# rakugakiki (落書き)
+# rakugaki (落書き)
 
 A Rust library for rendering TTF/OTF font characters as ASCII art in the terminal.
 
